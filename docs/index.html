@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OpenShift on Google Cloud Platform</title>
+    <meta charset="utf-8">
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body { font-family: 'Droid Serif'; }
+      h1, h2, h3, h4 {
+        font-family: 'Yanone Kaffeesatz';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+
+      .remark-slide-content { font-size: 1.6em; }
+      .remark-slide-content h1 { font-size: 2.4em; }
+      .remark-slide-content h2 { font-size: 2.0em; }
+      .remark-slide-content h3 { font-size: 1.6em; }
+      .remark-slide-content h4 { font-size: 1.2em; }
+      .remark-code { font-size: 0.8em; }
+      .remark-slide-number { font-size: 0.8em; }
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle
+
+# OpenShift on Google Cloud Platform
+### Peter Schiffer
+#### [github.com/pschiffe/ocp-on-gcp](https://github.com/pschiffe/ocp-on-gcp)
+
+---
+
+# Agenda
+
+* What?
+* Why?
+* How?
+
+---
+
+# What?
+
+Highly available production quality OpenShift Container Platform architecture that leverages native infrastructure of cloud provider.
+
+---
+
+# Why?
+
+---
+
+background-image: url(img/ocp-on-gcp-arch.svg)
+
+???
+
+Who will provision the infrastructure?
+
+---
+
+# Cloud Providers
+
+* OpenStack
+* Google Cloud Platform (GCP)
+* Amazon Web Services (AWS)
+* Microsoft Azure
+* VMware
+
+---
+
+# How?
+
+Provide Reference Architecture:
+
+https://blog.openshift.com/openshift-container-platform-reference-architecture-implementation-guides/
+
+Code:
+
+https://github.com/openshift/openshift-ansible-contrib/tree/master/reference-architecture
+
+---
+
+# New Agenda!
+
+1. Provision the infrastructure
+1. Deploy OpenShift
+1. Configure OpenShit / post-install tasks
+
+---
+
+class: center, middle
+
+# Provision the infrastructure
+
+---
+
+## Google Cloud DNS
+
+* Provides DNS service
+* https://cloud.google.com/dns/
+
+## Google Cloud Virtual Network
+
+* Provides virtual networking
+    * Single network
+    * Traffic controlled by firewall rules
+        * Both ingress and egress
+        * Using tags
+* https://cloud.google.com/virtual-network/
+
+---
+
+## Google Cloud Storage
+
+* Provides object storage used by Image Registry
+* https://cloud.google.com/storage/
+
+## Google Compute Engine
+
+* Provides virtual machines
+* https://cloud.google.com/compute/
+
+---
+
+# Google Compute Engine
+
+---
+
+### Custom images
+
+* Google provides RHEL images, but with limited subscription (no OpenShift)
+* We use official RHEL 7 KVM image, registered by customer to his subscription
+* https://cloud.google.com/compute/docs/images/create-delete-deprecate-private-images
+
+### Bastion instance
+
+* Only host with publicly accessible SSH
+    * SSH proxy for accessing other hosts
+* Runs deployment of OpenShift with Ansible
+
+---
+
+### Instance templates
+
+* Pre-define machine type, image, disks
+* https://cloud.google.com/compute/docs/instance-templates
+
+### Instance groups
+
+* Manage group of identical instances as a single entity
+* Support autoscaling, load balancing, rolling updates..
+* https://cloud.google.com/compute/docs/instance-groups/creating-groups-of-managed-instances
+
+---
+
+### Load Balancing
+
+* Is hard
+* https://cloud.google.com/load-balancing/
+
+![OpenShift on GCP](img/ocp-on-gcp-arch.svg)
+
+---
+
+#### HTTP(S) Load Balancing
+
+* Does not support WebSocket
+* https://cloud.google.com/compute/docs/load-balancing/http/
+
+#### SSL proxy
+
+* Used for external master HTTPS access
+* https://cloud.google.com/compute/docs/load-balancing/tcp-ssl/
+
+---
+
+#### Network Load Balancing
+
+* For internal master access and for external router access
+* https://cloud.google.com/compute/docs/load-balancing/network/
+
+#### Internal Load Balancing
+
+* New
+* https://cloud.google.com/compute/docs/load-balancing/internal/
+
+---
+
+### SSL proxy
+
+* Forwarding rule
+    * IP address
+    * Target proxy
+        * Certificate
+        * Backend service
+            * Instance group
+                * Instance
+
+### Network Load Balancing
+
+* Forwarding rule
+    * IP address
+    * Target pool
+        * Instance group
+            * Instance
+
+---
+
+### +
+
+* Global resources
+    * Regional resources
+        * Zonal resources
+
+
+* and Health checks
+
+---
+
+class: center, middle
+
+# Deploy OpenShift
+
+---
+
+## Advanced installation with Ansible
+
+* Dynamic inventory for GCE
+* https://docs.openshift.com/container-platform/latest/install_config/install/advanced_install.html
+
+---
+
+class: center, middle
+
+# Configure OpenShit / post-install tasks
+
+---
+
+## With Ansible
+
+* GCE specific configuration
+* Fine tune firewall on some hosts
+* Directory quota
+* Deploy Registry
+* Deployment validation
+
+---
+
+class: center, middle
+
+# Wanna try?
+
+---
+
+## Prerequisites
+
+* Google account
+* Red Hat account
+    * RHEL and OpenShift subscriptions
+
+Setup gcloud utility:
+```bash
+sudo yum -y install curl python which tar qemu-img \
+    openssl gettext git
+curl https://sdk.cloud.google.com | bash
+exec -l $SHELL
+gcloud components install beta
+gcloud init
+```
+
+---
+
+## Deploy
+
+```bash
+git clone https://github.com/openshift/openshift-ansible-contrib.git
+cd openshift-ansible-contrib/reference-architecture/gce-cli
+cp config.sh.example config.sh
+vi config.sh
+./gcloud.sh
+
+# Bonus: tired of it?
+./gcloud.sh --revert
+```
+
+---
+
+class: center, middle
+
+# Questions?
+
+    </textarea>
+    <script src="remark-latest.min.js">
+    </script>
+    <script>
+      var slideshow = remark.create({
+        ratio: '4:3',
+        highlightLines: false
+      });
+    </script>
+  </body>
+</html>
+
